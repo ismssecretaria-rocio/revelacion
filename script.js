@@ -504,6 +504,35 @@ document.getElementById("btn-cerrar-sesion").addEventListener("click", ev => {
   document.getElementById("login-usuario").focus();
 });
 
+// ====== Actualización automática ======
+// Si hay una versión publicada más nueva, recargar la página sola
+const VERSION_APP = document.querySelector('meta[name="version-app"]')?.content;
+
+async function buscarNuevaVersion() {
+  if (!VERSION_APP) return;
+  try {
+    const resp = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!resp.ok) return;
+    const { version } = await resp.json();
+    if (!version || version === VERSION_APP) return;
+
+    // Evitar recargas en bucle si el navegador sigue sirviendo la versión vieja
+    const intento = `revelacion-recarga-${version}`;
+    if (sessionStorage.getItem(intento)) return;
+    sessionStorage.setItem(intento, "1");
+
+    // Refrescar la copia guardada de index.html antes de recargar
+    await fetch(location.pathname, { cache: "reload" });
+    location.reload();
+  } catch (_) {}
+}
+
+setInterval(buscarNuevaVersion, 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") buscarNuevaVersion();
+});
+buscarNuevaVersion();
+
 // ====== Inicialización ======
 armarTablero();
 armarParticipantes();

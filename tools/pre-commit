@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pone un número de versión nuevo en cada commit, para que los navegadores
+# descarguen los archivos actualizados y las pestañas abiertas se recarguen solas.
+V=$(date +%Y%m%d%H%M%S)
+sed -i -E \
+  -e "s/(name=\"version-app\" content=\")[0-9]+/\1$V/" \
+  -e "s/(style\.css\?v=)[0-9]+/\1$V/" \
+  -e "s/(script\.js\?v=)[0-9]+/\1$V/" \
+  index.html
+printf '{"version": "%s"}\n' "$V" > version.json
+git add index.html version.json
