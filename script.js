@@ -13,6 +13,8 @@ const PARTICIPANTES_INICIALES = {
   tubby:     ["Mamá Ro", "Norma", "Marce", "Angie", "Nati", "Ro M", "Ani", "Blanquita", "Ro L", "Polo", "Elian", "Nacho", "Mili", "Guada"],
 };
 
+const JUEGOS_INICIALES = ["Tatetí", "Misión mamadera", "Abri la boquita", "Operación ojota"];
+
 function participantesIniciales() {
   return Object.fromEntries(EQUIPOS.map(e => [e.id, [...(PARTICIPANTES_INICIALES[e.id] || [])]]));
 }
@@ -26,12 +28,7 @@ let datos = cargar();
 
 function datosVacios() {
   return {
-    juegos: [
-      { nombre: "Juego 1", puntos: puntosVacios() },
-      { nombre: "Juego 2", puntos: puntosVacios() },
-      { nombre: "Juego 3", puntos: puntosVacios() },
-      { nombre: "Juego 4", puntos: puntosVacios() },
-    ],
+    juegos: JUEGOS_INICIALES.map(nombre => ({ nombre, puntos: puntosVacios() })),
     participantes: participantesIniciales(),
   };
 }
@@ -45,7 +42,10 @@ function cargar() {
   try {
     const guardado = JSON.parse(localStorage.getItem(CLAVE_V2));
     if (guardado && Array.isArray(guardado.juegos)) {
-      // Asegurar que participantes exista
+      // Juegos con nombre por defecto ("Juego N"): usar el nombre inicial
+      guardado.juegos.forEach((j, i) => {
+        if (JUEGOS_INICIALES[i] && j.nombre === `Juego ${i + 1}`) j.nombre = JUEGOS_INICIALES[i];
+      });
       // Sin participantes guardados: usar la lista inicial
       const sinParticipantes = !guardado.participantes ||
         EQUIPOS.every(e => !(guardado.participantes[e.id] || []).length);
@@ -68,8 +68,7 @@ function cargar() {
   try {
     const v1 = JSON.parse(localStorage.getItem(CLAVE_V1));
     if (Array.isArray(v1)) {
-      const juegosNombres = ["Juego 1", "Juego 2", "Juego 3", "Juego 4"];
-      const juegos = juegosNombres.map((nombre, i) => ({
+      const juegos = JUEGOS_INICIALES.map((nombre, i) => ({
         nombre,
         puntos: Object.fromEntries(EQUIPOS.map(e => [e.id, Number(v1[i]?.[e.id]) || 0])),
       }));
