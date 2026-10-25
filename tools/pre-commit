@@ -6,6 +6,7 @@ sed -i -E \
   -e "s/(name=\"version-app\" content=\")[0-9]+/\1$V/" \
   -e "s/(style\.css\?v=)[0-9]+/\1$V/" \
   -e "s/(script\.js\?v=)[0-9]+/\1$V/" \
+  -e "s/(firebase-config\.js\?v=)[0-9]+/\1$V/" \
   index.html
 printf '{"version": "%s"}\n' "$V" > version.json
 git add index.html version.json

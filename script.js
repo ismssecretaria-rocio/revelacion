@@ -37,31 +37,37 @@ function puntosVacios() {
   return Object.fromEntries(EQUIPOS.map(e => [e.id, 0]));
 }
 
+// Completa y corrige datos guardados (localStorage o Firebase). Devuelve null si no sirven.
+// Firebase puede devolver las listas como objetos y omite las listas vacías.
+function normalizar(crudo, { rellenarParticipantes = false } = {}) {
+  if (!crudo || typeof crudo !== "object" || !crudo.juegos) return null;
+  const comoLista = v => Array.isArray(v) ? v.filter(x => x != null) : (v && typeof v === "object" ? Object.values(v) : []);
+
+  const juegos = comoLista(crudo.juegos).map((j, i) => {
+    let nombre = typeof j?.nombre === "string" && j.nombre ? j.nombre : `Juego ${i + 1}`;
+    // Juegos con nombre por defecto ("Juego N"): usar el nombre inicial
+    if (JUEGOS_INICIALES[i] && nombre === `Juego ${i + 1}`) nombre = JUEGOS_INICIALES[i];
+    const puntos = Object.fromEntries(EQUIPOS.map(e => {
+      const n = Number(j?.puntos?.[e.id]);
+      return [e.id, Number.isFinite(n) ? n : 0];
+    }));
+    return { nombre, puntos };
+  });
+  if (!juegos.length) return null;
+
+  let participantes = Object.fromEntries(EQUIPOS.map(e => [e.id, comoLista(crudo.participantes?.[e.id]).map(String)]));
+  // Sin participantes guardados: usar la lista inicial
+  if (rellenarParticipantes && EQUIPOS.every(e => !participantes[e.id].length)) {
+    participantes = participantesIniciales();
+  }
+  return { juegos, participantes };
+}
+
 function cargar() {
   // Intentar v2
   try {
-    const guardado = JSON.parse(localStorage.getItem(CLAVE_V2));
-    if (guardado && Array.isArray(guardado.juegos)) {
-      // Juegos con nombre por defecto ("Juego N"): usar el nombre inicial
-      guardado.juegos.forEach((j, i) => {
-        if (JUEGOS_INICIALES[i] && j.nombre === `Juego ${i + 1}`) j.nombre = JUEGOS_INICIALES[i];
-      });
-      // Sin participantes guardados: usar la lista inicial
-      const sinParticipantes = !guardado.participantes ||
-        EQUIPOS.every(e => !(guardado.participantes[e.id] || []).length);
-      if (sinParticipantes) guardado.participantes = participantesIniciales();
-      // Asegurar que todos los equipos tengan entrada en participantes
-      EQUIPOS.forEach(e => {
-        if (!guardado.participantes[e.id]) guardado.participantes[e.id] = [];
-      });
-      // Asegurar que cada juego tenga puntos para todos los equipos
-      guardado.juegos.forEach(j => {
-        EQUIPOS.forEach(e => {
-          if (typeof j.puntos[e.id] !== "number") j.puntos[e.id] = 0;
-        });
-      });
-      return guardado;
-    }
+    const guardado = normalizar(JSON.parse(localStorage.getItem(CLAVE_V2)), { rellenarParticipantes: true });
+    if (guardado) return guardado;
   } catch (_) {}
 
   // Migrar desde v1
@@ -86,6 +92,117 @@ function cargar() {
 
 function guardar() {
   try { localStorage.setItem(CLAVE_V2, JSON.stringify(datos)); } catch (_) {}
+}
+
+// ====== Sincronización entre celulares (Firebase Realtime Database) ======
+// Todos los celulares leen y escriben el mismo nodo "tablero".
+// Sin configuración en firebase-config.js, el tablero funciona solo en este navegador.
+const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/13.1.0";
+
+const nube = {
+  activa: false,
+  db: null,
+  fb: null, // funciones del SDK
+  escribir(ruta, valor) {
+    if (!this.activa) return;
+    this.fb.set(this.fb.ref(this.db, `tablero/${ruta}`), valor).catch(errorNube);
+  },
+  sumar(ruta, delta) {
+    if (!this.activa) return;
+    this.fb.set(this.fb.ref(this.db, `tablero/${ruta}`), this.fb.increment(delta)).catch(errorNube);
+  },
+};
+
+function errorNube(err) {
+  console.error("Firebase:", err);
+  mostrarEstadoNube("error");
+}
+
+function mostrarEstadoNube(estado) {
+  const el = document.getElementById("estado-nube");
+  if (!el) return;
+  const textos = {
+    conectado: "En vivo",
+    desconectado: "Sin conexión",
+    error: "Error al sincronizar",
+  };
+  el.hidden = false;
+  el.dataset.estado = estado;
+  el.querySelector(".estado-texto").textContent = textos[estado];
+}
+
+async function iniciarNube() {
+  const config = window.FIREBASE_CONFIG;
+  if (!config || !config.databaseURL) return;
+  try {
+    const [{ initializeApp }, fb] = await Promise.all([
+      import(`${FIREBASE_SDK}/firebase-app.js`),
+      import(`${FIREBASE_SDK}/firebase-database.js`),
+    ]);
+    nube.fb = fb;
+    nube.db = fb.getDatabase(initializeApp(config));
+    const refTablero = fb.ref(nube.db, "tablero");
+
+    // Si la base está vacía, el primer celular sube sus datos
+    await fb.runTransaction(refTablero, actual => (actual === null ? datos : undefined));
+
+    nube.activa = true;
+    fb.onValue(refTablero, snap => {
+      const remoto = normalizar(snap.val());
+      if (remoto) aplicarDatosRemotos(remoto);
+    }, errorNube);
+
+    fb.onValue(fb.ref(nube.db, ".info/connected"), snap => {
+      mostrarEstadoNube(snap.val() ? "conectado" : "desconectado");
+    });
+  } catch (err) {
+    errorNube(err);
+  }
+}
+
+let tableroPendiente = false;
+
+function aplicarDatosRemotos(remoto) {
+  const anterior = datos;
+  const totalesAntes = Object.fromEntries(calcularTotales().map(t => [t.id, t.total]));
+  datos = remoto;
+  guardar();
+
+  // Tablero: si los juegos son los mismos, actualizar solo los números (no se pierde el foco)
+  const mismosJuegos = remoto.juegos.length === anterior.juegos.length &&
+    remoto.juegos.every((j, i) => j.nombre === anterior.juegos[i].nombre);
+  if (mismosJuegos) {
+    cuerpo.querySelectorAll("input[data-juego]").forEach(inp => {
+      if (inp === document.activeElement) return;
+      inp.value = datos.juegos[inp.dataset.juego].puntos[inp.dataset.equipo];
+    });
+    const cambiados = calcularTotales().filter(t => t.total !== totalesAntes[t.id]).map(t => t.id);
+    actualizarResultados(cambiados.length > 0, cambiados);
+  } else if (document.activeElement?.classList.contains("nombre-juego")) {
+    tableroPendiente = true; // se rearma cuando termine de editar el nombre
+  } else {
+    armarTablero();
+  }
+
+  if (JSON.stringify(remoto.participantes) !== JSON.stringify(anterior.participantes)) {
+    rearmarParticipantesConservandoTexto();
+  }
+}
+
+// Rearma la vista de participantes sin borrar lo que alguien está escribiendo
+function rearmarParticipantesConservandoTexto() {
+  const textos = {};
+  document.querySelectorAll(".input-participante").forEach(inp => { textos[inp.dataset.equipo] = inp.value; });
+  const enfocado = document.activeElement?.classList.contains("input-participante")
+    ? document.activeElement.dataset.equipo : null;
+
+  cerrarTransferPopover();
+  armarParticipantes();
+
+  document.querySelectorAll(".input-participante").forEach(inp => {
+    if (textos[inp.dataset.equipo]) inp.value = textos[inp.dataset.equipo];
+    if (inp.dataset.equipo === enfocado) inp.focus();
+  });
 }
 
 // ====== Navegación ======
@@ -182,7 +299,7 @@ function actualizarResultados(animar = true, equipoCambiado = null) {
     const esLider = hayPuntos && t.total === maximo;
     el.classList.toggle("lider", esLider);
     filaEquipos.querySelector(`[data-equipo="${t.id}"]`).classList.toggle("col-lider", esLider);
-    if (animar && t.id === equipoCambiado) {
+    if (animar && [].concat(equipoCambiado).includes(t.id)) {
       el.classList.remove("salto");
       void el.offsetWidth;
       el.classList.add("salto");
@@ -216,6 +333,8 @@ function agregarJuego() {
   const num = datos.juegos.length + 1;
   datos.juegos.push({ nombre: `Juego ${num}`, puntos: puntosVacios() });
   guardar();
+  // Subir solo el juego nuevo, para no pisar puntos que otro celular acaba de cargar
+  nube.escribir(`juegos/${num - 1}`, datos.juegos[num - 1]);
   armarTablero();
 }
 
@@ -226,6 +345,7 @@ function eliminarJuego(idx) {
   if (tienePuntos && !confirm(`"${juego.nombre}" tiene puntos cargados. ¿Eliminar?`)) return;
   datos.juegos.splice(idx, 1);
   guardar();
+  nube.escribir("juegos", datos.juegos);
   armarTablero();
 }
 
@@ -238,6 +358,7 @@ function renombrarJuego(idx, nuevoNombre) {
   }
   datos.juegos[idx].nombre = nombre;
   guardar();
+  nube.escribir(`juegos/${idx}/nombre`, nombre);
 }
 
 // ====== Render Participantes ======
@@ -279,12 +400,14 @@ function agregarParticipante(equipoId, nombre) {
   if (!datos.participantes[equipoId]) datos.participantes[equipoId] = [];
   datos.participantes[equipoId].push(n);
   guardar();
+  nube.escribir(`participantes/${equipoId}`, datos.participantes[equipoId]);
   armarParticipantes();
 }
 
 function eliminarParticipante(equipoId, idx) {
   datos.participantes[equipoId].splice(idx, 1);
   guardar();
+  nube.escribir(`participantes/${equipoId}`, datos.participantes[equipoId]);
   armarParticipantes();
 }
 
@@ -294,6 +417,7 @@ function moverParticipante(equipoId, idx, dir) {
   if (nuevoIdx < 0 || nuevoIdx >= lista.length) return;
   [lista[idx], lista[nuevoIdx]] = [lista[nuevoIdx], lista[idx]];
   guardar();
+  nube.escribir(`participantes/${equipoId}`, lista);
   armarParticipantes();
 }
 
@@ -302,6 +426,8 @@ function transferirParticipante(origenId, idx, destinoId) {
   if (!datos.participantes[destinoId]) datos.participantes[destinoId] = [];
   datos.participantes[destinoId].push(nombre);
   guardar();
+  nube.escribir(`participantes/${origenId}`, datos.participantes[origenId]);
+  nube.escribir(`participantes/${destinoId}`, datos.participantes[destinoId]);
   cerrarTransferPopover();
   armarParticipantes();
 }
@@ -356,10 +482,15 @@ function cerrarTransferPopover() {
 }
 
 // ====== Eventos: Puntos ======
-function setPuntos(i, id, valor) {
+// delta: si viene de los botones + / −, se suma en el servidor para no pisar
+// a otro celular que toque al mismo tiempo
+function setPuntos(i, id, valor, delta = null) {
   datos.juegos[i].puntos[id] = Number.isFinite(valor) ? valor : 0;
   guardar();
   actualizarResultados(true, id);
+  const ruta = `juegos/${i}/puntos/${id}`;
+  if (delta !== null) nube.sumar(ruta, delta);
+  else nube.escribir(ruta, datos.juegos[i].puntos[id]);
 }
 
 cuerpo.addEventListener("input", ev => {
@@ -373,10 +504,11 @@ cuerpo.addEventListener("click", ev => {
   if (!btn) return;
   const i = Number(btn.dataset.juego);
   const id = btn.dataset.equipo;
-  const nuevo = (datos.juegos[i].puntos[id] || 0) + Number(btn.dataset.delta);
+  const delta = Number(btn.dataset.delta);
+  const nuevo = (datos.juegos[i].puntos[id] || 0) + delta;
   const inp = cuerpo.querySelector(`input[data-juego="${i}"][data-equipo="${id}"]`);
   inp.value = nuevo;
-  setPuntos(i, id, nuevo);
+  setPuntos(i, id, nuevo, delta);
 });
 
 cuerpo.addEventListener("focusin", ev => {
@@ -387,6 +519,10 @@ cuerpo.addEventListener("focusin", ev => {
 cuerpo.addEventListener("blur", ev => {
   if (ev.target.classList.contains("nombre-juego")) {
     renombrarJuego(Number(ev.target.dataset.juegoIdx), ev.target.textContent);
+    if (tableroPendiente) {
+      tableroPendiente = false;
+      armarTablero();
+    }
   }
 }, true);
 
@@ -409,11 +545,15 @@ document.getElementById("btn-agregar-juego").addEventListener("click", agregarJu
 
 // ====== Eventos: Reiniciar ======
 document.getElementById("btn-reiniciar").addEventListener("click", () => {
-  if (!confirm("¿Seguro que querés borrar todos los puntos?")) return;
+  const aviso = nube.activa
+    ? "¿Seguro que querés borrar todos los puntos? Se borran en todos los celulares."
+    : "¿Seguro que querés borrar todos los puntos?";
+  if (!confirm(aviso)) return;
   datos.juegos.forEach(j => {
     EQUIPOS.forEach(e => { j.puntos[e.id] = 0; });
   });
   guardar();
+  nube.escribir("juegos", datos.juegos);
   armarTablero();
 });
 
@@ -537,3 +677,4 @@ buscarNuevaVersion();
 armarTablero();
 armarParticipantes();
 navegarA("tablero");
+iniciarNube();

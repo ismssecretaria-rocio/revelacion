@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version-app" content="20261025120718">
+  <meta name="version-app" content="20261025121321">
   <title>Tablero de la Revelaci&oacute;n</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20261025120718">
+  <link rel="stylesheet" href="style.css?v=20261025121321">
   <script>
     try { if (sessionStorage.getItem("revelacion-sesion") === "ok") document.documentElement.classList.add("autenticado"); } catch (_) {}
   </script>
@@ -68,6 +68,7 @@
       <header class="encabezado">
         <h1>&iquest;<span class="nene">Nene</span> o <span class="nena">Nena</span>?</h1>
         <p class="subtitulo">Tablero de juegos de la revelaci&oacute;n</p>
+        <p id="estado-nube" class="estado-nube" hidden><span class="estado-punto"></span><span class="estado-texto"></span></p>
       </header>
 
       <main class="contenido">
@@ -97,6 +98,7 @@
     </div>
   </div>
 
-  <script src="script.js?v=20261025120718"></script>
+  <script src="firebase-config.js?v=20261025121321"></script>
+  <script src="script.js?v=20261025121321"></script>
 </body>
 </html>

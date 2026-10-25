@@ -1318,3 +1318,41 @@ html:not(.autenticado) .sidebar-overlay { display: none !important; }
     padding: 28px 20px 22px;
   }
 }
+
+/* ====== Estado de sincronización ====== */
+.estado-nube {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--vidrio);
+  border: 1px solid var(--vidrio-borde);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.estado-nube[hidden] { display: none; }
+
+.estado-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--plata);
+}
+
+.estado-nube[data-estado="conectado"] .estado-punto {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  animation: latido 2s ease-in-out infinite;
+}
+
+.estado-nube[data-estado="desconectado"] .estado-punto { background: var(--oro); }
+.estado-nube[data-estado="error"] { color: #b42d6f; }
+.estado-nube[data-estado="error"] .estado-punto { background: var(--rosa); }
+
+@keyframes latido {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.05); }
+}
