@@ -6,6 +6,17 @@ const EQUIPOS = [
   { id: "tubby",     nombre: "Los Tubby Papilla",       logo: "img/tubby.jpg" },
 ];
 
+const PARTICIPANTES_INICIALES = {
+  bananines: ["Vero", "Mati", "Ari", "Fran", "Pocha", "Damian", "Pauli", "Mica", "Mariano", "Ruben", "Oscar", "Martina", "Lean", "Ambar"],
+  pokemones: ["Favio", "Octavio", "Maca", "Julio", "Alicia", "Noe", "Yani", "Gabi", "Marcela", "Lili", "Ana", "Oscar V", "Sofi", "Novio de martina"],
+  autitos:   ["Papá Leo", "Bety", "Diego", "Patri", "Claudia", "Ricky", "Nora", "Lu", "Fede", "Rocio killer", "Killer", "German", "Maira", "Gasty"],
+  tubby:     ["Mamá Ro", "Norma", "Marce", "Angie", "Nati", "Ro M", "Ani", "Blanquita", "Ro L", "Polo", "Elian", "Nacho", "Mili", "Guada"],
+};
+
+function participantesIniciales() {
+  return Object.fromEntries(EQUIPOS.map(e => [e.id, [...(PARTICIPANTES_INICIALES[e.id] || [])]]));
+}
+
 const CLAVE_V1 = "revelacion-puntos-v1";
 const CLAVE_V2 = "revelacion-datos-v2";
 
@@ -21,7 +32,7 @@ function datosVacios() {
       { nombre: "Juego 3", puntos: puntosVacios() },
       { nombre: "Juego 4", puntos: puntosVacios() },
     ],
-    participantes: Object.fromEntries(EQUIPOS.map(e => [e.id, []])),
+    participantes: participantesIniciales(),
   };
 }
 
@@ -35,9 +46,10 @@ function cargar() {
     const guardado = JSON.parse(localStorage.getItem(CLAVE_V2));
     if (guardado && Array.isArray(guardado.juegos)) {
       // Asegurar que participantes exista
-      if (!guardado.participantes) {
-        guardado.participantes = Object.fromEntries(EQUIPOS.map(e => [e.id, []]));
-      }
+      // Sin participantes guardados: usar la lista inicial
+      const sinParticipantes = !guardado.participantes ||
+        EQUIPOS.every(e => !(guardado.participantes[e.id] || []).length);
+      if (sinParticipantes) guardado.participantes = participantesIniciales();
       // Asegurar que todos los equipos tengan entrada en participantes
       EQUIPOS.forEach(e => {
         if (!guardado.participantes[e.id]) guardado.participantes[e.id] = [];
@@ -63,7 +75,7 @@ function cargar() {
       }));
       const migrado = {
         juegos,
-        participantes: Object.fromEntries(EQUIPOS.map(e => [e.id, []])),
+        participantes: participantesIniciales(),
       };
       localStorage.setItem(CLAVE_V2, JSON.stringify(migrado));
       return migrado;
