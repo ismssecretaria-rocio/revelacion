@@ -102,13 +102,19 @@ function navegarA(vista) {
 }
 
 function toggleSidebar() {
-  document.querySelector(".sidebar").classList.toggle("abierto");
-  document.querySelector(".sidebar-overlay").classList.toggle("visible");
+  const abierto = document.querySelector(".sidebar").classList.toggle("abierto");
+  document.querySelector(".sidebar-overlay").classList.toggle("visible", abierto);
+  const btn = document.getElementById("btn-hamburguesa");
+  btn.classList.toggle("abierto", abierto);
+  btn.setAttribute("aria-label", abierto ? "Cerrar menú" : "Abrir menú");
 }
 
 function cerrarSidebar() {
   document.querySelector(".sidebar").classList.remove("abierto");
   document.querySelector(".sidebar-overlay").classList.remove("visible");
+  const btn = document.getElementById("btn-hamburguesa");
+  btn.classList.remove("abierto");
+  btn.setAttribute("aria-label", "Abrir menú");
 }
 
 // ====== Render Tablero ======
@@ -136,6 +142,7 @@ function armarTablero() {
       </th>
       ${EQUIPOS.map(e => `
         <td>
+          ${equipoMovil(e)}
           <div class="celda-puntos">
             <button class="paso menos" data-juego="${i}" data-equipo="${e.id}" data-delta="-1" aria-label="Restar punto">−</button>
             <input type="number" inputmode="numeric" data-juego="${i}" data-equipo="${e.id}" value="${juego.puntos[e.id]}">
@@ -146,9 +153,14 @@ function armarTablero() {
 
   // Totales
   filaTotales.innerHTML = `<th>Total</th>` + EQUIPOS.map(e =>
-    `<td><span class="total" id="total-${e.id}">0</span></td>`).join("");
+    `<td>${equipoMovil(e)}<span class="total" id="total-${e.id}">0</span></td>`).join("");
 
   actualizarResultados(false);
+}
+
+// Etiqueta de equipo dentro de cada celda (solo visible en celulares)
+function equipoMovil(e) {
+  return `<span class="equipo-movil" aria-hidden="true"><img src="${e.logo}" alt=""><span>${e.nombre}</span></span>`;
 }
 
 function calcularTotales() {

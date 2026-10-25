@@ -398,6 +398,11 @@ tbody tr:hover .btn-eliminar-juego {
   transform: translateY(0);
 }
 
+/* Etiqueta de equipo por celda (solo celulares) */
+.equipo-movil {
+  display: none;
+}
+
 /* Celdas de puntos */
 .celda-puntos {
   display: inline-flex;
@@ -922,6 +927,24 @@ th.col-lider .equipo img {
     pointer-events: auto;
   }
 
+  /* Sin z-index propio, para que el sidebar quede por encima del overlay */
+  .app-layout {
+    z-index: auto;
+  }
+
+  .sidebar {
+    padding-top: 68px;
+  }
+
+  .sidebar-titulo {
+    text-align: left;
+    padding-left: 16px;
+  }
+
+  .btn-hamburguesa.abierto span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+  .btn-hamburguesa.abierto span:nth-child(2) { opacity: 0; }
+  .btn-hamburguesa.abierto span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+
   .app {
     padding: 12px 12px;
     padding-top: 60px;
@@ -1003,6 +1026,166 @@ th.col-lider .equipo img {
 
   .grid-participantes {
     grid-template-columns: 1fr;
+  }
+
+  /* --- Tablero como tarjetas: un juego por tarjeta, un renglón por equipo --- */
+  .tabla-contenedor {
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+  }
+
+  table, tbody, tfoot, tr, th, td {
+    display: block;
+    width: 100%;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody tr,
+  tfoot tr {
+    background: var(--vidrio);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--vidrio-borde);
+    border-radius: 16px;
+    box-shadow: 0 6px 20px var(--sombra);
+    padding: 8px 12px 10px;
+    margin-bottom: 12px;
+  }
+
+  tbody tr:nth-child(odd) td,
+  tbody tr:nth-child(odd) th,
+  tbody tr:hover td,
+  tbody tr:hover th {
+    background: transparent;
+  }
+
+  tbody th,
+  tfoot th {
+    border-radius: 0;
+    padding: 6px 44px 8px 0;
+    border-bottom: 1px solid var(--borde);
+    margin-bottom: 4px;
+    white-space: normal;
+    font-size: 1.15rem;
+  }
+
+  tfoot th {
+    padding-right: 0;
+    border-top: none;
+  }
+
+  .btn-eliminar-juego {
+    right: 0;
+    width: 40px;
+    height: 40px;
+  }
+
+  tbody td,
+  tfoot td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0;
+    border-radius: 0;
+    border-top: none;
+  }
+
+  tbody td + td,
+  tfoot td + td {
+    border-top: 1px dashed rgba(30, 42, 90, 0.08);
+  }
+
+  .equipo-movil {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1.15;
+  }
+
+  .equipo-movil img {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--blanco);
+    box-shadow: 0 2px 6px var(--sombra);
+  }
+
+  .celda-puntos {
+    flex-shrink: 0;
+  }
+
+  .paso {
+    width: 40px;
+    height: 40px;
+  }
+
+  .celda-puntos input {
+    width: 52px;
+    font-size: 1.15rem;
+  }
+
+  .total {
+    font-size: 1.4rem;
+    min-width: 64px;
+    padding: 4px 12px;
+  }
+
+  .total.lider {
+    transform: none;
+  }
+
+  .acciones-tablero {
+    padding: 0 0 4px;
+  }
+
+  /* Podio en grilla de 2 */
+  .podio {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .puesto {
+    min-width: 0;
+  }
+
+  .puesto.p1,
+  .puesto.p1:hover {
+    transform: none;
+  }
+
+  /* Evitar el zoom automático de iOS al enfocar campos */
+  .card-equipo-agregar input,
+  .login-campo input {
+    font-size: 16px;
+  }
+
+  .card-equipo {
+    padding: 16px;
+  }
+
+  .titulo-seccion {
+    font-size: 1.3rem;
   }
 }
 
@@ -1128,4 +1311,10 @@ html:not(.autenticado) .sidebar-overlay { display: none !important; }
 
 .nav-salir:hover {
   background: var(--rosa-suave);
+}
+
+@media (max-width: 600px) {
+  .login-card {
+    padding: 28px 20px 22px;
+  }
 }
